@@ -30,3 +30,10 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(UserSerializer(request.user).data)
+
+class LeaderboardView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        players = User.objects.order_by('-wins', '-total_duels')[:10]
+        return Response(UserSerializer(players, many=True).data)

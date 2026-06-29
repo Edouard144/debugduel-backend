@@ -85,24 +85,39 @@ class SubmitCodeView(APIView):
                     submission2=opponent_sub.code,
                     language=room.language
                 )
+                winner = result['winner']
                 p1 = result['player1']
                 p2 = result['player2']
+
                 creator_sub.correctness = p1['correctness']
                 creator_sub.cleanliness = p1['cleanliness']
                 creator_sub.efficiency = p1['efficiency']
                 creator_sub.security = p1['security']
                 creator_sub.score = p1['score']
                 creator_sub.ai_feedback = p1['feedback']
-                creator_sub.is_winner = result['winner'] == 'player1'
+                creator_sub.is_winner = winner == 'player1'
                 creator_sub.save()
+
                 opponent_sub.correctness = p2['correctness']
                 opponent_sub.cleanliness = p2['cleanliness']
                 opponent_sub.efficiency = p2['efficiency']
                 opponent_sub.security = p2['security']
                 opponent_sub.score = p2['score']
                 opponent_sub.ai_feedback = p2['feedback']
-                opponent_sub.is_winner = result['winner'] == 'player2'
+                opponent_sub.is_winner = winner == 'player2'
                 opponent_sub.save()
+
+                room.creator.total_duels += 1
+                room.opponent.total_duels += 1
+                if winner == 'player1':
+                    room.creator.wins += 1
+                    room.opponent.losses += 1
+                else:
+                    room.opponent.wins += 1
+                    room.creator.losses += 1
+                room.creator.save()
+                room.opponent.save()
+
                 room.status = 'finished'
                 room.save()
             except Exception as e:
