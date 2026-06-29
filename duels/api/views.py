@@ -2,8 +2,8 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from duels.models import DuelRoom
-from .serializers import DuelRoomSerializer
+from duels.models import DuelRoom, Submission
+from .serializers import DuelRoomSerializer, SubmissionSerializer
 import random
 import string
 
@@ -51,3 +51,38 @@ class DuelDetailView(APIView):
         except DuelRoom.DoesNotExist:
             return Response({'error': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
         return Response(DuelRoomSerializer(room).data)
+
+class SubmitCodeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, code):
+        try:
+            room = DuelRoom.objects.get(code=code, status='active')
+        except DuelRoom.DoesNotExist:
+            return Response({'error': 'Active room not found'}, status=status.HTTP_404_NOT_FOUND)
+        if request.user != room.creator and request.user != room.opponent:
+            return Response({'error': 'You are not a player in this room'}, status=status.HTTP_403_FORBIDDEN)
+        existing = Submission.objects.filter(room=room, player=request.user).first()
+        if existing:
+            return Response({'error': 'You already submitted'}, status=status.HTTP_400_BAD_REQUEST)
+        submission = Submission.objects.create(
+            room=room,
+            player=request.user,
+            code=request.data.get('code', '')
+        )
+        submissions_count = Submission.objects.filter(room=room).count()
+        if submissions_count == 2:
+            room.status = 'finished'
+            room.save()
+        return Response(SubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
+
+class RoomSubmissionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, code):
+        try:
+            room = DuelRoom.objects.get(code=code)
+        except DuelRoom.DoesNotExist:
+            return Response({'error': 'Room not found'}, status=status.HTTP_404_NOT_FOUND)
+        submissions = Submission.objects.filter(room=room)
+        return Response(SubmissionSerializer(submissions, many=True).data)

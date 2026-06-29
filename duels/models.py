@@ -35,3 +35,21 @@ class DuelRoom(models.Model):
 
     def __str__(self):
         return f"Duel {self.code} ({self.status})"
+
+
+class Submission(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    room = models.ForeignKey(DuelRoom, on_delete=models.CASCADE, related_name='submissions')
+    player = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='submissions')
+    code = models.TextField()
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    score = models.FloatField(null=True, blank=True)
+    correctness = models.FloatField(null=True, blank=True)
+    cleanliness = models.FloatField(null=True, blank=True)
+    efficiency = models.FloatField(null=True, blank=True)
+    security = models.FloatField(null=True, blank=True)
+    ai_feedback = models.TextField(blank=True)
+    is_winner = models.BooleanField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Submission by {self.player} in {self.room.code}"
