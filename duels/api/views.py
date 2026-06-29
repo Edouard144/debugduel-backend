@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from duels.models import DuelRoom, Submission
 from .serializers import DuelRoomSerializer, SubmissionSerializer
+from duels.judge import judge_submissions
 import random
 import string
 
@@ -70,10 +71,44 @@ class SubmitCodeView(APIView):
             player=request.user,
             code=request.data.get('code', '')
         )
-        submissions_count = Submission.objects.filter(room=room).count()
-        if submissions_count == 2:
-            room.status = 'finished'
+        submissions = Submission.objects.filter(room=room)
+        if submissions.count() == 2:
+            room.status = 'judging'
             room.save()
+            subs = list(submissions)
+            creator_sub = next(s for s in subs if s.player == room.creator)
+            opponent_sub = next(s for s in subs if s.player == room.opponent)
+            try:
+                result = judge_submissions(
+                    buggy_code=room.buggy_code,
+                    submission1=creator_sub.code,
+                    submission2=opponent_sub.code,
+                    language=room.language
+                )
+                p1 = result['player1']
+                p2 = result['player2']
+                creator_sub.correctness = p1['correctness']
+                creator_sub.cleanliness = p1['cleanliness']
+                creator_sub.efficiency = p1['efficiency']
+                creator_sub.security = p1['security']
+                creator_sub.score = p1['score']
+                creator_sub.ai_feedback = p1['feedback']
+                creator_sub.is_winner = result['winner'] == 'player1'
+                creator_sub.save()
+                opponent_sub.correctness = p2['correctness']
+                opponent_sub.cleanliness = p2['cleanliness']
+                opponent_sub.efficiency = p2['efficiency']
+                opponent_sub.security = p2['security']
+                opponent_sub.score = p2['score']
+                opponent_sub.ai_feedback = p2['feedback']
+                opponent_sub.is_winner = result['winner'] == 'player2'
+                opponent_sub.save()
+                room.status = 'finished'
+                room.save()
+            except Exception as e:
+                room.status = 'finished'
+                room.save()
+                return Response({'error': f'Judging failed: {str(e)}'}, status=500)
         return Response(SubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)
 
 class RoomSubmissionsView(APIView):

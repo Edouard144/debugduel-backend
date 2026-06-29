@@ -6,6 +6,7 @@ class DuelRoom(models.Model):
     STATUS_CHOICES = [
         ('waiting', 'Waiting'),
         ('active', 'Active'),
+        ('judging', 'Judging'),
         ('finished', 'Finished'),
     ]
 
